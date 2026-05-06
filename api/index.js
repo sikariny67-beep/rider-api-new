@@ -28,7 +28,7 @@ const Order = mongoose.model('Order', {
     note: String
 });
 
-// ดึงข้อมูล (GET) - เรียงอันใหม่ไว้บนสุด
+
 app.get('/api/orders', async (req, res) => {
     await connectDB();
     try {
@@ -39,7 +39,7 @@ app.get('/api/orders', async (req, res) => {
     }
 });
 
-// บันทึกข้อมูล (POST)
+
 app.post('/api/orders', async (req, res) => {
     await connectDB();
     try {
@@ -51,7 +51,7 @@ app.post('/api/orders', async (req, res) => {
     }
 });
 
-// 🔥 อัปเดตข้อมูล (PUT) - เพิ่มมาใหม่สำหรับแก้ไข
+
 app.put('/api/orders/:id', async (req, res) => {
     await connectDB();
     try {
@@ -62,7 +62,7 @@ app.put('/api/orders/:id', async (req, res) => {
     }
 });
 
-// 🔥 ลบข้อมูล (DELETE) - เพิ่มมาใหม่สำหรับลบ
+
 app.delete('/api/orders/:id', async (req, res) => {
     await connectDB();
     try {

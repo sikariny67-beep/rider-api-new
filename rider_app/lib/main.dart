@@ -8,8 +8,8 @@ void main() => runApp(MaterialApp(
       home: RiderDashboard(),
       theme: ThemeData.dark(),
       debugShowCheckedModeBanner: false,
-    ));
-
+    ));   
+  
 class RiderDashboard extends StatefulWidget {
   @override
   _RiderDashboardState createState() => _RiderDashboardState();
@@ -20,7 +20,7 @@ class _RiderDashboardState extends State<RiderDashboard> {
 
   int currentOrders = 0;
   int todayIncome = 0;
-  int dailyTarget = 60;
+  int dailyTarget = 100;
   bool isLoading = false;
 
   @override
@@ -29,7 +29,6 @@ class _RiderDashboardState extends State<RiderDashboard> {
     fetchLatestData();
   }
 
-  // --- 🔄 1. ดึงข้อมูล (แก้เป็น data[0] ให้ดึงของใหม่ล่าสุดที่อยู่บนสุด) ---
   Future<void> fetchLatestData() async {
     setState(() => isLoading = true);
     try {
@@ -53,7 +52,6 @@ class _RiderDashboardState extends State<RiderDashboard> {
     }
   }
 
-  // --- 🛠️ 2. บันทึกข้อมูล ---
   Future<void> saveOrder(int count, int income, {String note = "บันทึกจากแอพ"}) async {
     setState(() {
       currentOrders = count;
@@ -78,7 +76,6 @@ class _RiderDashboardState extends State<RiderDashboard> {
     }
   }
 
-  // --- 📝 3. หน้าต่างบวกงาน ---
   void _showAddDialog() {
     TextEditingController countController = TextEditingController();
     TextEditingController incomeController = TextEditingController();
@@ -126,7 +123,6 @@ class _RiderDashboardState extends State<RiderDashboard> {
     );
   }
 
-  // --- 🗑️ 4. หน้าต่างยืนยันการเริ่มวันใหม่ (ล้างข้อมูล) ---
   void _showResetDialog() {
     showDialog(
       context: context,
@@ -155,7 +151,6 @@ class _RiderDashboardState extends State<RiderDashboard> {
     );
   }
 
-  // --- 🔥 5. หน้าต่าง Pro Analytics ---
   void _showProAnalytics() {
     double plannedOrders = 30;
 
@@ -245,6 +240,16 @@ class _RiderDashboardState extends State<RiderDashboard> {
         backgroundColor: Colors.green[800],
         actions: [
           IconButton(
+            icon: Icon(Icons.history, color: Colors.white),
+            tooltip: "ประวัติการวิ่งงาน",
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => HistoryPage(apiUrl: apiUrl)),
+              ).then((_) => fetchLatestData()); // พอกลับมาหน้าหลักให้ดึงข้อมูลใหม่เผื่อมีการแก้ไข
+            },
+          ),
+          IconButton(
             icon: Icon(Icons.restart_alt, color: Colors.white),
             tooltip: "เริ่มวันใหม่",
             onPressed: _showResetDialog,
@@ -300,18 +305,204 @@ class _RiderDashboardState extends State<RiderDashboard> {
                 ),
               ),
               SizedBox(height: 50),
-              Text("Developer: ศิครินทร์ ยนภพ", style: TextStyle(color: Colors.grey[500], fontSize: 14)),
-              Text("Student ID: 6700767", style: TextStyle(color: Colors.grey[500], fontSize: 14)),
+              Text("Developer: Sikarin & sorasak", style: TextStyle(color: Colors.grey[500], fontSize: 14)),
+              Text("Student ID: 6700767 & 6700772", style: TextStyle(color: Colors.grey[500], fontSize: 14)),
             ],
           ),
         ),
-      ),
+      ),                    
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddDialog,
         icon: Icon(Icons.add, color: Colors.white),
         label: Text("บวกออเดอร์", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.green[700],
       ),
+    );
+  }
+}
+
+// =========================================================================
+//   HistoryPage (หน้าประวัติการวิ่งงาน + ลบ/แก้ไข) เด้อออ
+// =========================================================================
+
+class HistoryPage extends StatefulWidget {
+  final String apiUrl;
+  HistoryPage({required this.apiUrl});
+
+  @override
+  _HistoryPageState createState() => _HistoryPageState();
+}
+
+class _HistoryPageState extends State<HistoryPage> {
+  List historyData = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchHistory();
+  }
+
+  Future<void> fetchHistory() async {
+    setState(() => isLoading = true);
+    try {
+      String urlWithCacheBuster = "${widget.apiUrl}?t=${DateTime.now().millisecondsSinceEpoch}";
+      final response = await http.get(Uri.parse(urlWithCacheBuster));
+      if (response.statusCode == 200) {
+        setState(() {
+          historyData = json.decode(response.body);
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      print("Fetch History Error: $e");
+      setState(() => isLoading = false);
+    }
+  }
+
+  
+  Future<void> deleteOrder(String id) async {
+    try {
+      final response = await http.delete(Uri.parse("${widget.apiUrl}/$id"));
+      if (response.statusCode == 200) {
+        fetchHistory(); 
+      }
+    } catch (e) {
+      print("Delete Error: $e");
+    }
+  }
+
+  
+  Future<void> updateOrder(String id, int newCount, int newIncome) async {
+    try {
+      final response = await http.put(
+        Uri.parse("${widget.apiUrl}/$id"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "orderCount": newCount,
+          "income": newIncome,
+          "note": "แก้ไขข้อมูลแล้ว"
+        }),
+      );
+      if (response.statusCode == 200) {
+        fetchHistory();
+      }
+    } catch (e) {
+      print("Update Error: $e");
+    }
+  }
+
+  
+  void _confirmDelete(String id) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: Text("ลบรายการนี้?", style: TextStyle(color: Colors.white)),
+        content: Text("ข้อมูลจะหายไปจากระบบถาวร", style: TextStyle(color: Colors.grey[400])),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text("ยกเลิก", style: TextStyle(color: Colors.grey))),
+          ElevatedButton(
+            onPressed: () {
+              deleteOrder(id);
+              Navigator.pop(context);
+            },
+            child: Text("ลบทิ้งเลย"),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+          ),
+        ],
+      ),
+    );
+  }
+
+  
+  void _showEditDialog(String id, int currentCount, int currentIncome) {
+    TextEditingController countController = TextEditingController(text: currentCount.toString());
+    TextEditingController incomeController = TextEditingController(text: currentIncome.toString());
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: Text("แก้ไขข้อมูล ✏️", style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: countController,
+              decoration: InputDecoration(labelText: "ยอดออเดอร์สะสม", labelStyle: TextStyle(color: Colors.orangeAccent)),
+              keyboardType: TextInputType.number,
+              style: TextStyle(color: Colors.white),
+            ),
+            TextField(
+              controller: incomeController,
+              decoration: InputDecoration(labelText: "ยอดเงินสะสม", labelStyle: TextStyle(color: Colors.orangeAccent)),
+              keyboardType: TextInputType.number,
+              style: TextStyle(color: Colors.white),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text("ยกเลิก", style: TextStyle(color: Colors.grey))),
+          ElevatedButton(
+            onPressed: () {
+              updateOrder(id, int.parse(countController.text), int.parse(incomeController.text));
+              Navigator.pop(context);
+            },
+            child: Text("บันทึกการแก้ไข"),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: Text("ประวัติการวิ่งงาน 📜"),
+        backgroundColor: Colors.grey[900],
+      ),
+      body: isLoading
+          ? Center(child: CircularProgressIndicator(color: Colors.greenAccent))
+          : historyData.isEmpty
+              ? Center(child: Text("ยังไม่มีประวัติการวิ่งงาน", style: TextStyle(color: Colors.grey)))
+              : ListView.builder(
+                  padding: EdgeInsets.all(10),
+                  itemCount: historyData.length,
+                  itemBuilder: (context, index) {
+                    var item = historyData[index];
+                    return Card(
+                      color: Colors.grey[850],
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.green[800],
+                          child: Icon(Icons.two_wheeler, color: Colors.white, size: 20),
+                        ),
+                        title: Text("${item['orderCount']} งาน | ${item['income']} บาท", 
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                        subtitle: Text("${item['date']} \nหมายเหตุ: ${item['note'] ?? '-'}", 
+                          style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.edit, color: Colors.orangeAccent),
+                              onPressed: () => _showEditDialog(item['_id'], item['orderCount'], item['income']),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.delete, color: Colors.redAccent),
+                              onPressed: () => _confirmDelete(item['_id']),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
     );
   }
 }
